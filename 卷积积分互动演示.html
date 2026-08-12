@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卷积积分互动演示 · 四步法</title>
+<style>
+  :root{
+    --blue:#005CA1; --blue2:#5B9BD5; --red:#D82E1C; --green:#00B050;
+    --bg:#f4f7fb; --card:#fff; --ink:#22303f; --gray:#667;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Microsoft YaHei","微软雅黑",sans-serif;background:var(--bg);color:var(--ink);line-height:1.65;}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 16px 60px;}
+  .hero{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-radius:14px;padding:22px 26px;box-shadow:0 6px 18px rgba(0,92,161,.25);}
+  .hero h1{margin:0 0 6px;font-size:25px;letter-spacing:1px;}
+  .hero p{margin:0;opacity:.92;font-size:14px;}
+  .formula{margin-top:12px;background:rgba(255,255,255,.14);border-radius:8px;padding:8px 14px;font-size:16px;display:inline-block;}
+  .formula b{color:#ffe9a8;}
+  .card{background:var(--card);border-radius:14px;padding:18px 20px;margin-top:20px;box-shadow:0 3px 10px rgba(34,48,63,.07);}
+  .sec-title{display:flex;align-items:center;font-size:18px;font-weight:700;color:var(--blue);margin-bottom:14px;}
+  .bar{width:5px;height:18px;background:var(--red);border-radius:3px;margin-right:10px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin-bottom:8px;}
+  .ctl{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--gray);}
+  .ctl select,.ctl input[type=range]{accent-color:var(--blue);}
+  .ctl select{padding:5px 8px;border:1px solid #cdd8e4;border-radius:7px;font-family:inherit;color:var(--ink);}
+  .btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:9px 20px;font-size:15px;cursor:pointer;font-family:inherit;transition:.15s;}
+  .btn:hover{background:#004a82;}
+  .btn.ghost{background:#eef3f9;color:var(--blue);border:1px solid var(--blue2);}
+  .tval{font-size:15px;font-weight:700;color:var(--red);min-width:54px;text-align:center;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:8px;}
+  .panel{background:#fafcff;border:1px solid #e6eef7;border-radius:12px;padding:12px 12px 8px;}
+  .panel .pt{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin-bottom:6px;}
+  .badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:700;}
+  .panel.p2 .badge{background:var(--red);}
+  .panel.p3 .badge{background:var(--green);}
+  .panel.p4 .badge{background:#7a3fb0;}
+  canvas{width:100%;display:block;border-radius:6px;background:#fff;}
+  .panel .note{font-size:12px;color:var(--gray);margin-top:4px;min-height:32px;}
+  .ybadge{font-size:14px;color:var(--green);font-weight:700;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--gray);margin-top:6px;}
+  .legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px;}
+  .footer{text-align:center;color:var(--gray);font-size:12px;margin-top:26px;}
+  @media(max-width:680px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>卷积积分互动演示 · 四步法</h1>
+    <p>信号与系统 · y(t)=x(t)∗h(t) 的"翻转 → 移位 → 相乘 → 积分"全过程</p>
+    <div class="formula">y(t) = x(t) ∗ h(t) = ∫<sub>−∞</sub><sup>∞</sup> <b>x(τ) · h(t − τ)</b> dτ</div>
+  </div>
+
+  <!-- 控制 -->
+  <div class="card">
+    <div class="sec-title"><span class="bar"></span>控制面板</div>
+    <div class="controls">
+      <div class="ctl">
+        <span>信号组合</span>
+        <select id="preset">
+          <option value="rect">矩形 ⊛ 矩形（→ 三角波）</option>
+          <option value="rect_exp">矩形 ⊛ 指数衰减</option>
+          <option value="exp_exp">指数 ⊛ 指数</option>
+        </select>
+      </div>
+      <div class="ctl">
+        <span>时间参数 t（移位量）</span>
+        <input type="range" id="tSlider" min="-1" max="3" step="0.01" value="0.5" style="width:280px;">
+      </div>
+      <div class="ctl"><span>&nbsp;</span><span class="tval" id="tVal">t = 0.50</span></div>
+      <div class="ctl">
+        <span>播放速度</span>
+        <input type="range" id="speed" min="0.3" max="3" step="0.1" value="1" style="width:120px;">
+      </div>
+      <button class="btn" id="playBtn">▶ 播放</button>
+      <button class="btn ghost" id="resetBtn">重置</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i>x(τ) 输入信号</span>
+      <span><i style="background:var(--red)"></i>h(τ) / h(t−τ) 冲激响应</span>
+      <span><i style="background:var(--green)"></i>x(τ)·h(t−τ) 乘积</span>
+      <span><i style="background:#bdbdbd"></i>h(τ) 原波形（参考）</span>
+    </div>
+  </div>
+
+  <!-- 四步 -->
+  <div class="card">
+    <div class="sec-title"><span class="bar"></span>卷积计算的四个步骤（当前 t 下实时演示）</div>
+    <div class="grid">
+      <div class="panel p1">
+        <div class="pt"><span class="badge">1</span>翻转（Flip）</div>
+        <canvas id="cv1" height="200"></canvas>
+        <div class="note">将冲激响应 h(τ) 关于纵轴翻转，得到 h(−τ)。这是卷积"反褶"的本质。</div>
+      </div>
+      <div class="panel p2">
+        <div class="pt"><span class="badge">2</span>移位（Shift）</div>
+        <canvas id="cv2" height="200"></canvas>
+        <div class="note" id="note2">把 h(−τ) 沿 τ 轴平移 t，得到 h(t−τ)；t 越大，波形越往右移。</div>
+      </div>
+      <div class="panel p3">
+        <div class="pt"><span class="badge">3</span>相乘（Multiply）</div>
+        <canvas id="cv3" height="200"></canvas>
+        <div class="note">在同一 τ 处，将 x(τ) 与 h(t−τ) 逐点相乘，得到被积函数 x(τ)·h(t−τ)（绿色）。</div>
+      </div>
+      <div class="panel p4">
+        <div class="pt"><span class="badge">4</span>积分（Integrate）</div>
+        <canvas id="cv4" height="200"></canvas>
+        <div class="note">对乘积曲线在 τ 全轴上求面积（积分），其结果就是当前 t 处的输出 <span class="ybadge" id="yval">y(t)=0.00</span>。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输出 -->
+  <div class="card">
+    <div class="sec-title"><span class="bar"></span>卷积结果 y(t)</div>
+    <canvas id="cvOut" height="260"></canvas>
+    <div class="note" style="font-size:13px;color:var(--gray);margin-top:6px;">横轴为时间 t，纵轴为输出 y(t)。随着 t 滑动（或播放），图中圆点沿曲线移动，实时反映本页四个步骤算出的每一个 y(t)。</div>
+  </div>
+
+  <div class="footer">卷积积分四步法互动演示 · 与《抽样定理》课程配套 · 可拖动 t 或点击播放观察</div>
+
+</div>
+
+<script>
+  // ---------- 信号定义 ----------
+  var SIGNALS = {
+    rect: {
+      x: function(a){ return (a>=0 && a<=1) ? 1 : 0; },
+      h: function(a){ return (a>=0 && a<=1) ? 1 : 0; },
+      desc: "矩形⊛矩形"
+    },
+    rect_exp: {
+      x: function(a){ return (a>=0 && a<=1) ? 1 : 0; },
+      h: function(a){ return (a>=0) ? Math.exp(-a) : 0; },
+      desc: "矩形⊛指数"
+    },
+    exp_exp: {
+      x: function(a){ return (a>=0) ? Math.exp(-a) : 0; },
+      h: function(a){ return (a>=0) ? Math.exp(-a) : 0; },
+      desc: "指数⊛指数"
+    }
+  };
+
+  var TAU_MIN=-1.5, TAU_MAX=3.5, N=900;
+  var T_MIN=-1, T_MAX=3, M=600;
+  var tau=[], dtau=(TAU_MAX-TAU_MIN)/N;
+  for(var i=0;i<=N;i++) tau.push(TAU_MIN + i*dtau);
+
+  // ---------- 画布初始化 ----------
+  function setup(cv){
+    var dpr=window.devicePixelRatio||1;
+    var r=cv.getBoundingClientRect();
+    cv.width=Math.max(1,Math.round(r.width*dpr));
+    cv.height=Math.max(1,Math.round(r.height*dpr));
+    var ctx=cv.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx:ctx,w:r.width,h:r.height};
+  }
+  var cv1=document.getElementById('cv1'),cv2=document.getElementById('cv2'),
+      cv3=document.getElementById('cv3'),cv4=document.getElementById('cv4'),
+      cvOut=document.getElementById('cvOut');
+  var S={};
+
+  function resizeAll(){
+    S.c1=setup(cv1);S.c2=setup(cv2);S.c3=setup(cv3);S.c4=setup(cv4);S.co=setup(cvOut);
+    drawAll();
+  }
+  window.addEventListener('resize', resizeAll);
+
+  // ---------- 绘图工具 ----------
+  function axes(ctx,w,h,x0,x1,y0,y1,pad){
+    ctx.clearRect(0,0,w,h);
+    var X=function(v){return pad+(v-x0)/(x1-x0)*(w-2*pad);};
+    var Y=function(v){return h-pad-(v-y0)/(y1-y0)*(h-2*pad);};
+    // 网格与轴
+    ctx.strokeStyle='#eef2f7';ctx.lineWidth=1;
+    for(var gx=Math.ceil(x0);gx<=x1;gx++){ctx.beginPath();ctx.moveTo(X(gx),pad);ctx.lineTo(X(gx),h-pad);ctx.stroke();}
+    ctx.strokeStyle='#c7d2dd';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(X(x0),Y(0));ctx.lineTo(X(x1),Y(0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(X(0),pad);ctx.lineTo(X(0),h-pad);ctx.stroke();
+    return {X:X,Y:Y};
+  }
+  function line(ctx,arr,mapX,mapY,color,width,dash){
+    ctx.save();
+    ctx.strokeStyle=color;ctx.lineWidth=width||2;
+    if(dash)ctx.setLineDash(dash);
+    ctx.beginPath();
+    for(var i=0;i<arr.length;i++){
+      var px=mapX(tau[i]),py=mapY(arr[i]);
+      if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  function fillUnder(ctx,arr,mapX,mapY,color){
+    ctx.save();ctx.fillStyle=color;ctx.beginPath();
+    var started=false;
+    for(var i=0;i<arr.length;i++){
+      var px=mapX(tau[i]),py=mapY(arr[i]);
+      if(!started){ctx.moveTo(px,mapY(0));ctx.lineTo(px,py);started=true;}
+      else ctx.lineTo(px,py);
+    }
+    ctx.lineTo(mapX(tau[arr.length-1]),mapY(0));ctx.closePath();ctx.fill();ctx.restore();
+  }
+
+  // ---------- 计算当前帧 ----------
+  var state={preset:'rect',t:0.5,playing:false,speed:1};
+
+  function computeFrame(){
+    var sig=SIGNALS[state.preset];
+    var xarr=[],harr=[],hflip=[],hshift=[],prod=[];
+    for(var i=0;i<=N;i++){
+      var a=tau[i];
+      var xv=sig.x(a), hv=sig.h(a);
+      var hf=sig.h(-a);
+      var hs=sig.h(state.t-a);
+      xarr.push(xv);harr.push(hv);hflip.push(hf);hshift.push(hs);
+      prod.push(xv*hs);
+    }
+    return {xarr:arr(xarr),harr:harr,hflip:hflip,hshift:hshift,prod:prod};
+  }
+  function arr(a){return a;}
+
+  function computeY(){
+    // 预计算整条 y(t)
+    var sig=SIGNALS[state.preset];
+    var yt=[],ymax=0;
+    for(var j=0;j<=M;j++){
+      var t=T_MIN+(T_MAX-T_MIN)*j/M;
+      var s=0;
+      for(var i=0;i<=N;i++){ s+=sig.x(tau[i])*sig.h(t-tau[i])*dtau; }
+      yt.push(s); if(s>ymax)ymax=s;
+    }
+    return {yt:yt,ymax:ymax};
+  }
+
+  // ---------- 绘制四个面板 + 输出 ----------
+  function drawAll(){
+    var f=computeFrame();
+    var YMAX=1.25;
+    // Panel1 翻转
+    var o1=axes(S.c1.ctx,S.c1.w,S.c1.h,TAU_MIN,TAU_MAX,0,YMAX,30);
+    line(S.c1.ctx,f.harr,o1.X,o1.Y,'#bdbdbd',1.6,[5,4]);
+    line(S.c1.ctx,f.hflip,o1.X,o1.Y,'#D82E1C',2.2);
+    // Panel2 移位
+    var o2=axes(S.c2.ctx,S.c2.w,S.c2.h,TAU_MIN,TAU_MAX,0,YMAX,30);
+    line(S.c2.ctx,f.harr,o2.X,o2.Y,'#bdbdbd',1.6,[5,4]);
+    line(S.c2.ctx,f.hshift,o2.X,o2.Y,'#D82E1C',2.2);
+    // Panel3 相乘
+    var o3=axes(S.c3.ctx,S.c3.w,S.c3.h,TAU_MIN,TAU_MAX,0,YMAX,30);
+    line(S.c3.ctx,f.xarr,o3.X,o3.Y,'#005CA1',1.8);
+    line(S.c3.ctx,f.hshift,o3.X,o3.Y,'#D82E1C',1.4,[4,3]);
+    fillUnder(S.c3.ctx,f.prod,o3.X,o3.Y,'rgba(0,176,80,.30)');
+    line(S.c3.ctx,f.prod,o3.X,o3.Y,'#00B050',2.2);
+    // Panel4 积分
+    var o4=axes(S.c4.ctx,S.c4.w,S.c4.h,TAU_MIN,TAU_MAX,0,YMAX,30);
+    fillUnder(S.c4.ctx,f.prod,o4.X,o4.Y,'rgba(0,176,80,.45)');
+    line(S.c4.ctx,f.prod,o4.X,o4.Y,'#00B050',2.2);
+    // 当前 y(t)
+    var yv=0;for(var i=0;i<=N;i++) yv+=f.xarr[i]*f.hshift[i]*dtau;
+    document.getElementById('yval').textContent='y(t)='+yv.toFixed(3);
+    document.getElementById('note2').innerHTML='把 h(−τ) 沿 τ 轴平移 t，得到 h(t−τ)；当前 t='+state.t.toFixed(2)+'，波形'+(state.t>=0?'右移':'左移')+'。';
+
+    // 输出曲线
+    var Y=computeY();
+    var ytop=Y.ymax*1.18 || 1;
+    var oo=axes(S.co.ctx,S.co.w,S.co.h,T_MIN,T_MAX,0,ytop,34);
+    // 曲线
+    S.co.ctx.strokeStyle='#005CA1';S.co.ctx.lineWidth=2.4;S.co.ctx.beginPath();
+    for(var j=0;j<=M;j++){
+      var tt=T_MIN+(T_MAX-T_MIN)*j/M, px=oo.X(tt), py=oo.Y(Y.yt[j]);
+      if(j===0)S.co.ctx.moveTo(px,py);else S.co.ctx.lineTo(px,py);
+    }
+    S.co.ctx.stroke();
+    // 当前 t 处竖线 + 圆点
+    var cxp=oo.X(state.t), cyp=oo.Y(yv);
+    S.co.ctx.strokeStyle='rgba(216,46,28,.5)';S.co.ctx.lineWidth=1.5;
+    S.co.ctx.beginPath();S.co.ctx.moveTo(cxp,oo.Y(0));S.co.ctx.lineTo(cxp,oo.Y(ytop));S.co.ctx.stroke();
+    S.co.ctx.fillStyle='#D82E1C';S.co.ctx.beginPath();S.co.ctx.arc(cxp,cyp,6,0,2*Math.PI);S.co.ctx.fill();
+    S.co.ctx.fillStyle='#D82E1C';S.co.ctx.font='13px "Microsoft YaHei",sans-serif';
+    S.co.ctx.fillText('t='+state.t.toFixed(2)+'  y='+yv.toFixed(3), Math.min(cxp+8,S.co.w-120), oo.Y(ytop)+14);
+    // 轴标注
+    S.co.ctx.fillStyle='#667';S.co.ctx.font='12px "Microsoft YaHei",sans-serif';
+    S.co.ctx.fillText('t',S.co.w-16,oo.Y(0)-6);
+    S.co.ctx.fillText('y(t)',oo.X(T_MIN)+6,oo.Y(ytop)+16);
+  }
+
+  // ---------- 交互 ----------
+  var slider=document.getElementById('tSlider'),tVal=document.getElementById('tVal');
+  slider.addEventListener('input',function(){
+    state.t=parseFloat(slider.value);
+    tVal.textContent='t = '+state.t.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('preset').addEventListener('change',function(e){
+    state.preset=e.target.value; drawAll();
+  });
+  document.getElementById('speed').addEventListener('input',function(e){state.speed=parseFloat(e.target.value);});
+  var playBtn=document.getElementById('playBtn');
+  playBtn.addEventListener('click',function(){
+    state.playing=!state.playing;
+    playBtn.textContent=state.playing?'⏸ 暂停':'▶ 播放';
+  });
+  document.getElementById('resetBtn').addEventListener('click',function(){
+    state.playing=false;playBtn.textContent='▶ 播放';
+    state.t=0.5;slider.value=0.5;tVal.textContent='t = 0.50';drawAll();
+  });
+
+  // ---------- 动画循环 ----------
+  function loop(){
+    if(state.playing){
+      state.t+=0.012*state.speed;
+      if(state.t>T_MAX) state.t=T_MIN;
+      slider.value=state.t;
+      tVal.textContent='t = '+state.t.toFixed(2);
+      drawAll();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // 启动
+  resizeAll();
+  loop();
+</script>
+</body>
+</html>

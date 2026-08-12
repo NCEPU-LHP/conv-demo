@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>车轮倒转现象 · 采样混叠交互演示</title>
+<style>
+  :root{
+    --blue:#005CA1;        /* 主蓝（复用PPT主题） */
+    --blue2:#5B9BD5;       /* 浅蓝 */
+    --red:#D82E1C;         /* 强调红（混叠/警示） */
+    --green:#00B050;       /* 成功绿（无混叠） */
+    --ink:#222;
+    --muted:#666;
+    --line:#e3e8ef;
+    --bg:#f5f7fa;
+    --panel:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:"Microsoft YaHei","微软雅黑",-apple-system,"PingFang SC",sans-serif;}
+  header{
+    background:linear-gradient(135deg,var(--blue) 0%, #0072c6 100%);
+    color:#fff;padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,.12);
+  }
+  header h1{margin:0;font-size:20px;letter-spacing:1px;}
+  header p{margin:6px 0 0;font-size:13px;opacity:.9;}
+  .layout{
+    display:flex;gap:16px;padding:16px;align-items:stretch;flex-wrap:wrap;
+  }
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 1px 4px rgba(0,0,0,.05);padding:14px 16px;
+  }
+  .controls{flex:0 0 290px;min-width:260px;}
+  .stage{flex:1 1 520px;min-width:360px;display:flex;flex-direction:column;gap:14px;}
+  .info{flex:0 0 320px;min-width:280px;}
+  .panel h2{margin:0 0 12px;font-size:15px;color:var(--blue);
+    border-left:4px solid var(--blue);padding-left:8px;}
+
+  /* 控件 */
+  .ctrl{margin-bottom:16px;}
+  .ctrl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}
+  .ctrl label b{color:var(--blue);font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;accent-color:var(--blue);cursor:pointer;}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;}
+  button{
+    border:1px solid var(--blue);background:#fff;color:var(--blue);
+    padding:7px 12px;border-radius:6px;font-size:13px;cursor:pointer;
+    transition:.15s;font-family:inherit;
+  }
+  button:hover{background:var(--blue);color:#fff;}
+  button.primary{background:var(--blue);color:#fff;}
+  button.primary:hover{background:#00477d;}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .presets button{font-size:12px;padding:5px 9px;border-color:var(--blue2);color:#3a6ea5;}
+  .presets button:hover{background:var(--blue2);color:#fff;border-color:var(--blue2);}
+  .checks{font-size:13px;line-height:1.9;margin-top:4px;}
+  .checks label{cursor:pointer;user-select:none;}
+
+  /* 双轮 */
+  .wheels{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .wheel-box{position:relative;background:#fbfcfe;border:1px solid var(--line);
+    border-radius:10px;padding:8px;}
+  .wheel-box.viewfinder{border:2px solid var(--blue);}
+  .wheel-box .cap{text-align:center;font-size:13px;color:var(--muted);margin-top:4px;}
+  .wheel-box .vf-tag{position:absolute;top:6px;left:8px;font-size:11px;color:#fff;
+    background:var(--blue);padding:1px 7px;border-radius:4px;}
+  canvas{display:block;}
+  .timeline{width:100%;height:90px;background:#fbfcfe;border:1px solid var(--line);
+    border-radius:10px;}
+
+  /* 状态条 */
+  .status{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    background:#eef5fb;border:1px solid #cfe3f5;border-radius:8px;padding:10px 12px;font-size:13px;}
+  .pill{padding:3px 10px;border-radius:20px;font-weight:700;color:#fff;font-size:12px;}
+  .pill.fwd{background:var(--green);}
+  .pill.stop{background:#888;}
+  .pill.back{background:var(--red);}
+  .status .num{font-variant-numeric:tabular-nums;color:var(--blue);font-weight:700;}
+
+  /* 信息面板 */
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+  .kv span:first-child{color:var(--muted);}
+  .kv span:last-child{font-weight:700;font-variant-numeric:tabular-nums;}
+  .formula{background:#f3f6fa;border-radius:6px;padding:8px 10px;margin:8px 0;font-size:12.5px;line-height:1.7;color:#1a3a55;}
+  .formula b{color:var(--red);}
+  .link{font-size:12.5px;line-height:1.7;color:var(--ink);margin-top:8px;}
+  .link li{margin-bottom:4px;}
+  .ok{color:var(--green);font-weight:700;}
+  .bad{color:var(--red);font-weight:700;}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;}
+  @media(max-width:1180px){.controls,.info{flex:1 1 100%;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>车轮倒转现象 · 采样混叠交互演示</h1>
+  <p>真实车轮连续旋转＝连续信号；摄像机以采样频率 f<sub>s</sub> 离散拍照＝采样。当 f<sub>s</sub> 不够高，车轮会"变慢 / 静止 / 倒转" —— 这正是采样定理中的<b>混叠(Aliasing)</b>。</p>
+</header>
+
+<div class="layout">
+  <!-- 控制面板 -->
+  <aside class="panel controls">
+    <h2>参数调节</h2>
+
+    <div class="ctrl">
+      <label>车轮转速 f<sub>车轮</sub> <b><span id="vWheel">3.0</span> 转/秒</b></label>
+      <input type="range" id="sWheel" min="0" max="40" step="0.5" value="3" />
+    </div>
+
+    <div class="ctrl">
+      <label>摄像机采样频率 f<sub>s</sub> <b><span id="vFs">30</span> 帧/秒</b></label>
+      <input type="range" id="sFs" min="1" max="60" step="1" value="30" />
+    </div>
+
+    <div class="ctrl">
+      <label>辐条数 N <b><span id="vN">12</span> 根</b></label>
+      <input type="range" id="sN" min="3" max="24" step="1" value="12" />
+    </div>
+
+    <div class="ctrl">
+      <label>慢放系数（仅影响观看速度） <b><span id="vSlow">0.10</span>×</b></label>
+      <input type="range" id="sSlow" min="0.02" max="0.4" step="0.01" value="0.1" />
+    </div>
+
+    <div class="ctrl btns">
+      <button class="primary" id="btnPlay">⏸ 暂停</button>
+      <button id="btnStep">⏯ 单帧步进</button>
+      <button id="btnReset">↺ 重置</button>
+    </div>
+
+    <div class="ctrl">
+      <label style="margin-bottom:4px;">典型课堂案例（一键设置）</label>
+      <div class="presets">
+        <button data-w="3"  data-f="30" data-n="12">①正常(无混叠)</button>
+        <button data-w="23" data-f="24" data-n="12">②经典倒转</button>
+        <button data-w="2"  data-f="24" data-n="12">③对称静止</button>
+        <button data-w="37" data-f="24" data-n="12">④高速混叠</button>
+      </div>
+    </div>
+
+    <div class="checks">
+      <label><input type="checkbox" id="cReal" checked /> 显示真实车轮（连续）</label><br/>
+      <label><input type="checkbox" id="cFlash" checked /> 采样时刻闪光提示</label>
+    </div>
+  </aside>
+
+  <!-- 主舞台 -->
+  <main class="stage">
+    <div class="wheels">
+      <div class="wheel-box">
+        <canvas id="realCanvas" width="300" height="300"></canvas>
+        <div class="cap">真实车轮（连续旋转，肉眼所见真实现象）</div>
+      </div>
+      <div class="wheel-box viewfinder">
+        <span class="vf-tag">CAM</span>
+        <canvas id="camCanvas" width="300" height="300"></canvas>
+        <div class="cap">摄像机镜头（每秒只拍 f<sub>s</sub> 张，镜头内所见）</div>
+      </div>
+    </div>
+
+    <canvas id="timeline" class="timeline"></canvas>
+
+    <div class="status">
+      <span>表观转向：<span id="dirPill" class="pill fwd">正转</span></span>
+      <span>镜头内表观转速：<span class="num" id="vFapp">3.0</span> 转/秒</span>
+      <span>已采样帧数：<span class="num" id="vFrame">0</span></span>
+      <span>状态：<span id="vState" class="num">—</span></span>
+    </div>
+  </main>
+
+  <!-- 信息面板 -->
+  <aside class="panel info">
+    <h2>实时量化分析</h2>
+    <div class="kv"><span>每帧转角 Δθ</span><span id="kDelta">36.0°</span></div>
+    <div class="kv"><span>Δθ 折合辐条间距</span><span id="kSpokes">1.20 个</span></div>
+    <div class="kv"><span>表观转速(镜头所见)</span><span id="kFapp">3.00 转/秒</span></div>
+    <div class="kv"><span>无失真条件(辐条) f<sub>s</sub> ≥ 2Nf<sub>车轮</sub></span><span id="kNyq">满足</span></div>
+    <div class="kv"><span>镜头所见是否混叠</span><span id="kAlias">否</span></div>
+    <div class="kv"><span>最近"驻留频率"(对称静止)</span><span id="kStat">2.50 转/秒</span></div>
+
+    <div class="formula">
+      <b>每帧转角：</b> Δθ = 360° × f<sub>车轮</sub> / f<sub>s</sub><br/>
+      <b>表观转速：</b> f<sub>表观</sub> = f<sub>车轮</sub> − f<sub>s</sub>·round(f<sub>车轮</sub>·N / f<sub>s</sub>) / N<br/>
+      <b>无混叠看真转速：</b> f<sub>s</sub> ≥ 2 f<sub>车轮</sub>（对转速）<br/>
+      <b>无混叠看真辐条：</b> f<sub>s</sub> ≥ 2 N f<sub>车轮</sub>（对辐条特征）
+    </div>
+
+    <div class="link">
+      <b>与采样定理的联系：</b>
+      <ul>
+        <li>车轮真实转速是<b>连续信号</b>，摄像机按 f<sub>s</sub> 离散"采样"。人眼追踪的是<b>辐条</b>，其通过频率高达 N·f<sub>车轮</sub>。</li>
+        <li>对"转速信号"需 f<sub>s</sub> ≥ 2 f<sub>车轮</sub>；但对"辐条特征"需 f<sub>s</sub> ≥ 2N f<sub>车轮</sub>。后者才是决定镜头所见是否真实的关键。</li>
+        <li>当采样不足，高频被"折叠"成低频 → 镜头里车轮<b>变慢、静止甚至倒转</b>，这就是<b>混叠(Aliasing)</b>。</li>
+        <li>辐条具有 N 重旋转对称性：每帧恰好转过整数个辐条间距时，车轮<b>看似静止</b>（对称驻留）。</li>
+        <li>现实类比：电网 PMU 同步相量、故障录波、PWM 控制——采样率不足都会引发混叠，必须留足余量。</li>
+      </ul>
+    </div>
+    <div class="note">
+      教学提示：先用案例②"经典倒转"(23转/秒、24帧)让学生看到明显倒转，再调到案例①对比，引出"为什么转速那么快却像倒着走"——自然过渡到奈奎斯特采样定理。
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var BLUE="#005CA1", RED="#D82E1C", GREEN="#00B050", DARK="#33414f", GREY="#9aa7b2";
+
+  var state = {
+    fWheel: 3, fs: 30, N: 12, slow: 0.10,
+    playing: true, showReal: true, flash: true,
+    simTime: 0, nextCapture: 0, sampleAngle: 0, realAngle: 0,
+    frameCount: 0, flashAlpha: 0
+  };
+
+  // ---- 画布初始化（高DPI） ----
+  function setup(canvas){
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.width, h = canvas.height;       // 逻辑像素（HTML属性）
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    return {ctx:ctx, w:w, h:h, cx:w/2, cy:h/2, R:Math.min(w,h)/2 - 22};
+  }
+  var realC = setup(document.getElementById("realCanvas"));
+  var camC  = setup(document.getElementById("camCanvas"));
+  var tlCanvas = document.getElementById("timeline");
+  var tl = setup(tlCanvas);
+
+  // ---- 绘制车轮 ----
+  function drawWheel(c, angle, N, dim){
+    var ctx = c.ctx;
+    ctx.clearRect(0,0,c.w,c.h);
+    if(dim){ ctx.globalAlpha = 0.92; }
+    ctx.save();
+    ctx.translate(c.cx, c.cy);
+    ctx.rotate(angle);
+    // 轮辋
+    ctx.beginPath(); ctx.arc(0,0,c.R,0,2*Math.PI);
+    ctx.lineWidth = 4; ctx.strokeStyle = BLUE; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,c.R*0.62,0,2*Math.PI);
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "#bcd4ea"; ctx.stroke();
+    // 辐条
+    for(var i=0;i<N;i++){
+      var a = i*2*Math.PI/N;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(c.R*Math.cos(a), c.R*Math.sin(a));
+      if(i===0){ ctx.strokeStyle = RED; ctx.lineWidth = 5; }
+      else { ctx.strokeStyle = DARK; ctx.lineWidth = 2.5; }
+      ctx.stroke();
+    }
+    // 参考红点（标记第0根辐条顶端，便于判断转向）
+    ctx.beginPath(); ctx.arc(c.R, 0, 7, 0, 2*Math.PI);
+    ctx.fillStyle = RED; ctx.fill();
+    // 轮毂
+    ctx.beginPath(); ctx.arc(0,0,9,0,2*Math.PI);
+    ctx.fillStyle = BLUE; ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- 时间轴 ----
+  function drawTimeline(){
+    var ctx = tl.ctx, w = tl.w, h = tl.h;
+    ctx.clearRect(0,0,w,h);
+    var midY = h*0.55;
+    ctx.strokeStyle = "#c7d2dd"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(10, midY); ctx.lineTo(w-10, midY); ctx.stroke();
+    var Ts = 1/state.fs;
+    var win = 2.0; // 显示最近 2 秒（仿真时间）
+    var t0 = Math.max(0, state.simTime - win);
+    var x0 = 10, x1 = w-10;
+    function X(t){ return x0 + (t - t0)/(state.simTime - t0 + 1e-9) * (x1 - x0); }
+    // 采样时刻刻度
+    var start = Math.floor(t0 / Ts) * Ts;
+    for(var t = start; t <= state.simTime + 1e-9; t += Ts){
+      var x = X(t);
+      ctx.strokeStyle = "#7fb2e0"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, midY-10); ctx.lineTo(x, midY+10); ctx.stroke();
+    }
+    // 最近一次采样高亮
+    if(state.frameCount > 0){
+      var lastT = Math.floor(state.simTime / Ts) * Ts;
+      var xL = X(lastT);
+      ctx.fillStyle = BLUE;
+      ctx.beginPath(); ctx.arc(xL, midY, 4, 0, 2*Math.PI); ctx.fill();
+    }
+    // 播放头
+    var xp = X(state.simTime);
+    ctx.strokeStyle = RED; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(xp, midY-16); ctx.lineTo(xp, midY+16); ctx.stroke();
+    // 文字
+    ctx.fillStyle = "#667"; ctx.font = "11px 'Microsoft YaHei',sans-serif";
+    ctx.fillText("采样时刻 f_s="+state.fs+" fps ｜ 时间轴（最近 "+win.toFixed(1)+" 秒仿真）", 12, 16);
+    ctx.fillStyle = RED;
+    ctx.fillText("▶ 当前", Math.max(12, xp-14), midY+30);
+  }
+
+  // ---- 信息更新 ----
+  function fmt(x, n){ return (Math.round(x*Math.pow(10,n))/Math.pow(10,n)).toFixed(n); }
+  function updateInfo(){
+    var f = state.fWheel, fs = state.fs, N = state.N;
+    var deltaDeg = 360 * f / fs;            // 每帧真实转角
+    var spokeStep = 360 / N;
+    var perSpoke = deltaDeg / spokeStep;   // = f*N/fs，每帧折合几个辐条间距
+    var m = Math.round(perSpoke);
+    // 镜头所见表观转速（辐条对称折叠后的可见转速，含方向）
+    var fApp = f - m * fs / N;
+
+    document.getElementById("kDelta").textContent = fmt(deltaDeg,1) + "°";
+    document.getElementById("kSpokes").textContent = fmt(perSpoke,2) + " 个";
+
+    // 表观转速与转向
+    var pill = document.getElementById("dirPill");
+    var dirText, dirClass;
+    if(Math.abs(fApp) < 1e-6){ dirText = "静止"; dirClass = "stop"; }
+    else if(fApp > 0){ dirText = "正转(前进)"; dirClass = "fwd"; }
+    else { dirText = "倒转(后退)"; dirClass = "back"; }
+    pill.textContent = dirText; pill.className = "pill " + dirClass;
+    document.getElementById("kFapp").textContent = fmt(fApp,2) + " 转/秒";
+    document.getElementById("vFapp").textContent = fmt(Math.abs(fApp),2);
+    document.getElementById("vFrame").textContent = state.frameCount;
+
+    // 奈奎斯特（辐条特征，决定所见是否真实）
+    var nyqOk = fs >= 2 * N * f - 1e-9;
+    var nyq = document.getElementById("kNyq");
+    nyq.textContent = nyqOk ? "满足" : "不满足";
+    nyq.className = nyqOk ? "ok" : "bad";
+    var aliasEl = document.getElementById("kAlias");
+    // 镜头所见是否混叠：可见转速不等于真实转速
+    var aliased = Math.abs(fApp - f) > 1e-6;
+    aliasEl.textContent = aliased ? "是（频谱折叠）" : "否";
+    aliasEl.className = aliased ? "bad" : "ok";
+
+    // 最近对称驻留频率
+    var fStat = m * fs / N;
+    document.getElementById("kStat").textContent = fmt(fStat,2) + " 转/秒";
+
+    // 状态文字
+    var st = document.getElementById("vState");
+    if(f < 1e-6){ st.textContent = "车轮未转动"; st.className = "num"; }
+    else if(!aliased){ st.textContent = "正常复现（无混叠）"; st.className = "num ok"; }
+    else if(Math.abs(fApp) < 1e-6){ st.textContent = "对称静止错觉"; st.className = "num"; }
+    else if(fApp > 0){ st.textContent = "混叠→看似变慢正转"; st.className = "num"; }
+    else { st.textContent = "混叠→看似倒转！"; st.className = "num bad"; }
+  }
+
+  // ---- 主循环 ----
+  var last = performance.now();
+  function loop(now){
+    var dt = Math.min((now - last)/1000, 0.05); last = now;
+    if(state.playing){
+      state.simTime += dt * state.slow;
+      state.realAngle = 2*Math.PI*state.fWheel*state.simTime;
+      var Ts = 1/state.fs;
+      var captured = false;
+      // 在固定时间网格上采样（保证周期性严格正确）
+      while(state.simTime >= state.nextCapture){
+        var angleAt = 2*Math.PI*state.fWheel*state.nextCapture;
+        state.sampleAngle = angleAt % (2*Math.PI);
+        state.nextCapture += Ts;
+        state.frameCount++;
+        captured = true;
+      }
+      if(captured && state.flash){ state.flashAlpha = 0.85; }
+    }
+    state.flashAlpha = Math.max(0, state.flashAlpha - dt*3.5);
+
+    drawWheel(realC, state.realAngle, state.N, false);
+    drawWheel(camC, state.sampleAngle, state.N, false);
+    if(state.flashAlpha > 0){
+      camC.ctx.fillStyle = "rgba(255,255,255," + state.flashAlpha + ")";
+      camC.ctx.fillRect(0,0,camC.w,camC.h);
+      camC.ctx.fillStyle = "rgba(0,92,161," + Math.min(1,state.flashAlpha+0.15) + ")";
+      camC.ctx.font = "bold 20px 'Microsoft YaHei',sans-serif";
+      camC.ctx.fillText("● 采样!", 12, 28);
+    }
+    if(!state.showReal){
+      realC.ctx.fillStyle = "rgba(245,247,250,0.96)";
+      realC.ctx.fillRect(0,0,realC.w,realC.h);
+      realC.ctx.fillStyle = "#889";
+      realC.ctx.font = "13px 'Microsoft YaHei',sans-serif";
+      realC.ctx.fillText("（已隐藏真实车轮）", 70, realC.cy);
+    }
+    drawTimeline();
+    updateInfo();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- 控件绑定 ----
+  function bindRange(id, valId, key, fmtFn){
+    var el = document.getElementById(id);
+    var v = document.getElementById(valId);
+    el.addEventListener("input", function(){
+      state[key] = parseFloat(el.value);
+      v.textContent = fmtFn ? fmtFn(state[key]) : el.value;
+      if(key === "fs"){ state.nextCapture = state.simTime; } // 改变采样率后从当前时刻重新对齐网格
+    });
+  }
+  bindRange("sWheel","vWheel","fWheel", function(x){ return fmt(x,1); });
+  bindRange("sFs","vFs","fs", function(x){ return fmt(x,0); });
+  bindRange("sN","vN","N", function(x){ return fmt(x,0); });
+  bindRange("sSlow","vSlow","slow", function(x){ return fmt(x,2); });
+
+  document.getElementById("btnPlay").addEventListener("click", function(){
+    state.playing = !state.playing;
+    this.textContent = state.playing ? "⏸ 暂停" : "▶ 播放";
+  });
+  document.getElementById("btnReset").addEventListener("click", function(){
+    state.simTime = 0; state.nextCapture = 0; state.sampleAngle = 0;
+    state.realAngle = 0; state.frameCount = 0; state.flashAlpha = 0;
+  });
+  document.getElementById("btnStep").addEventListener("click", function(){
+    state.playing = false;
+    document.getElementById("btnPlay").textContent = "▶ 播放";
+    var Ts = 1/state.fs;
+    // 前进一格采样
+    state.nextCapture = Math.max(state.nextCapture, state.simTime) + 0;
+    if(state.nextCapture <= state.simTime) state.nextCapture = state.simTime + Ts;
+    var angleAt = 2*Math.PI*state.fWheel*state.nextCapture;
+    state.sampleAngle = angleAt % (2*Math.PI);
+    state.simTime = state.nextCapture;
+    state.nextCapture += Ts;
+    state.frameCount++;
+    state.flashAlpha = 0.85;
+  });
+  document.getElementById("cReal").addEventListener("change", function(){
+    state.showReal = this.checked;
+  });
+  document.getElementById("cFlash").addEventListener("change", function(){
+    state.flash = this.checked;
+  });
+  // 预设案例
+  document.querySelectorAll(".presets button").forEach(function(b){
+    b.addEventListener("click", function(){
+      var w = parseFloat(b.getAttribute("data-w"));
+      var f = parseFloat(b.getAttribute("data-f"));
+      var n = parseFloat(b.getAttribute("data-n"));
+      state.fWheel = w; state.fs = f; state.N = n;
+      document.getElementById("sWheel").value = w; document.getElementById("vWheel").textContent = fmt(w,1);
+      document.getElementById("sFs").value = f;   document.getElementById("vFs").textContent = fmt(f,0);
+      document.getElementById("sN").value = n;    document.getElementById("vN").textContent = fmt(n,0);
+      document.getElementById("btnReset").click();
+    });
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
